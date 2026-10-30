@@ -24,6 +24,7 @@ import { useCampaigns } from '../../context/CampaignContext';
 import { StepIndicator } from '../../components/creator/StepIndicator';
 import { StoryRenderer } from '../../components/story/StoryRenderer';
 import { SocialAdPreview } from '../../components/cards/SocialAdPreview';
+import { pickValidatedImage } from '../../lib/pickImage';
 
 const CATEGORIES: CampaignCategory[] = [
   'Environment',
@@ -84,7 +85,18 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
 
   // Step 2: Story
   const [storySections, setStorySections] = useState<StorySection[]>(() => savedDraft?.story || []);
-  const [newSectionType, setNewSectionType] = useState<'paragraph' | 'quote' | 'stat'>('paragraph');
+  const [newSectionType, setNewSectionType] = useState<'heading' | 'paragraph' | 'quote' | 'stat' | 'image'>('paragraph');
+  const [newImageUri, setNewImageUri] = useState<string>('');
+  const [newImageCaption, setNewImageCaption] = useState<string>('');
+  const [newImageCredit, setNewImageCredit] = useState<string>('');
+
+  // Inline editing of an existing story block
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState<string>('');
+  const [editStatValue, setEditStatValue] = useState<string>('');
+  const [editStatLabel, setEditStatLabel] = useState<string>('');
+  const [editCaption, setEditCaption] = useState<string>('');
+  const [editCredit, setEditCredit] = useState<string>('');
   const [newSectionContent, setNewSectionContent] = useState<string>('');
   const [newStatValue, setNewStatValue] = useState<string>('');
   const [newStatLabel, setNewStatLabel] = useState<string>('');
@@ -172,6 +184,28 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
         alert('Add at least one story section before continuing.');
         return;
       }
+      const hasStarterText = storySections.some(
+        sec =>
+          sec.content.startsWith('Describe ') ||
+          sec.content.startsWith('Summarize the evidence you are relying on')
+      );
+      if (hasStarterText) {
+        Alert.alert(
+          'Replace the starter text',
+          'Part of your story is still instruction text from the draft helper. Replace it with your own words before readers see it.',
+          [
+            { text: 'Edit story', style: 'cancel' },
+            {
+              text: 'Continue anyway',
+              onPress: () => {
+                triggerSaveDraft();
+                setCurrentStep(3);
+              }
+            }
+          ]
+        );
+        return;
+      }
       if (sources.length === 0) {
         Alert.alert(
           'No sources added',
@@ -205,6 +239,27 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
 
   // Step 2 Helpers
   const handleAddSection = () => {
+    if (newSectionType === 'image') {
+      if (!newImageUri) {
+        alert('Choose a photo first.');
+        return;
+      }
+      setStorySections([
+        ...storySections,
+        {
+          id: `sec-${Date.now()}`,
+          type: 'image',
+          content: newImageCaption.trim(),
+          imageUrl: newImageUri,
+          caption: newImageCaption.trim() || undefined,
+          credit: newImageCredit.trim() || undefined
+        }
+      ]);
+      setNewImageUri('');
+      setNewImageCaption('');
+      setNewImageCredit('');
+      return;
+    }
     if (!newSectionContent.trim() && newSectionType !== 'stat') return;
     const newSec: StorySection = {
       id: `sec-${Date.now()}`,
@@ -217,6 +272,51 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
     setNewSectionContent('');
     setNewStatValue('');
     setNewStatLabel('');
+  };
+
+  const handleStartEdit = (sec: StorySection) => {
+    setEditingId(sec.id);
+    setEditContent(sec.content || '');
+    setEditStatValue(sec.statValue || '');
+    setEditStatLabel(sec.statLabel || '');
+    setEditCaption(sec.caption || '');
+    setEditCredit(sec.credit || '');
+  };
+
+  const handleSaveEdit = (sec: StorySection) => {
+    if (sec.type !== 'image' && sec.type !== 'stat' && !editContent.trim()) {
+      alert('Write something, or delete this block instead.');
+      return;
+    }
+    if (sec.type === 'stat' && (!editStatValue.trim() || !editStatLabel.trim())) {
+      alert('A statistic needs both a number and a label.');
+      return;
+    }
+    setStorySections(
+      storySections.map(item =>
+        item.id !== sec.id
+          ? item
+          : sec.type === 'image'
+          ? {
+              ...item,
+              content: editCaption.trim(),
+              caption: editCaption.trim() || undefined,
+              credit: editCredit.trim() || undefined
+            }
+          : sec.type === 'stat'
+          ? { ...item, content: editContent.trim(), statValue: editStatValue.trim(), statLabel: editStatLabel.trim() }
+          : { ...item, content: editContent.trim() }
+      )
+    );
+    setEditingId(null);
+  };
+
+  const handleMoveSection = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= storySections.length) return;
+    const next = [...storySections];
+    [next[index], next[target]] = [next[target], next[index]];
+    setStorySections(next);
   };
 
   const handleRemoveSection = (id: string) => {
@@ -256,7 +356,7 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
       const topicTitle = topic.charAt(0).toUpperCase() + topic.slice(1);
       setTitle(topicTitle.slice(0, 60));
       setSummary(
-        `An explainer on ${topic.toLowerCase()}: what it is, who it affects, and what readers can do. Edit this so it says exactly what your message is.`
+        `An explainer on ${topic.toLowerCase()}: what it is, who it affects, and what readers can do.`
       );
       setStorySections([
         { id: `s-${Date.now()}-1`, type: 'heading', content: 'What this is about' },
@@ -489,6 +589,25 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.imagePresetsScroll}
               >
+                <TouchableOpacity
+                  style={[styles.presetImgWrapper, styles.uploadTile]}
+                  onPress={async () => {
+                    const uri = await pickValidatedImage();
+                    if (uri) setCoverImage(uri);
+                  }}
+                  accessibilityLabel="Upload your own cover image"
+                >
+                  <Ionicons name="cloud-upload-outline" size={20} color={colors.primary} />
+                  <Text style={styles.uploadTileText}>Upload</Text>
+                </TouchableOpacity>
+                {!!coverImage && !PRESET_IMAGES.includes(coverImage) && (
+                  <View style={[styles.presetImgWrapper, styles.activePresetImgWrapper]}>
+                    <Image source={{ uri: coverImage }} style={styles.presetThumbnail} />
+                    <View style={styles.presetCheckOverlay}>
+                      <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                    </View>
+                  </View>
+                )}
                 {PRESET_IMAGES.map((img, idx) => (
                   <TouchableOpacity
                     key={idx}
@@ -531,7 +650,7 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                   color={colors.primary}
                 />
                 <Text style={styles.previewToggleText}>
-                  {showLiveStoryPreview ? 'Edit' : 'Preview'}
+                  {showLiveStoryPreview ? 'Back to editing' : 'Preview story'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -551,19 +670,110 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                 {storySections.map((sec, idx) => (
                   <View key={sec.id} style={styles.sectionCard}>
                     <View style={styles.sectionCardHeader}>
-                      <Text style={styles.sectionTypeTag}>{sec.type.toUpperCase()}</Text>
-                      <TouchableOpacity onPress={() => handleRemoveSection(sec.id)}>
-                        <Ionicons name="trash-outline" size={16} color={colors.rose} />
-                      </TouchableOpacity>
+                      <Text style={styles.sectionTypeTag}>{sec.type.charAt(0).toUpperCase() + sec.type.slice(1)}</Text>
+                      <View style={styles.moveRow}>
+                        <TouchableOpacity
+                          style={styles.moveBtn}
+                          onPress={() => (editingId === sec.id ? setEditingId(null) : handleStartEdit(sec))}
+                          accessibilityLabel="Edit section"
+                        >
+                          <Ionicons name={editingId === sec.id ? 'close-outline' : 'create-outline'} size={19} color={colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.moveBtn}
+                          onPress={() => handleMoveSection(idx, -1)}
+                          disabled={idx === 0}
+                          accessibilityLabel="Move section up"
+                        >
+                          <Ionicons name="chevron-up" size={18} color={idx === 0 ? colors.border : colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.moveBtn}
+                          onPress={() => handleMoveSection(idx, 1)}
+                          disabled={idx === storySections.length - 1}
+                          accessibilityLabel="Move section down"
+                        >
+                          <Ionicons name="chevron-down" size={18} color={idx === storySections.length - 1 ? colors.border : colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.moveBtn}
+                          onPress={() => handleRemoveSection(sec.id)}
+                          accessibilityLabel="Delete section"
+                        >
+                          <Ionicons name="trash-outline" size={18} color={colors.rose} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
+                    {editingId === sec.id ? (
+                      <View style={{ gap: 8, marginTop: 6 }}>
+                        {sec.type === 'stat' && (
+                          <View style={styles.inputRow}>
+                            <TextInput
+                              style={[styles.textInput, { flex: 1, marginRight: 8 }]}
+                              placeholder="Number (e.g. 3.8x)"
+                              value={editStatValue}
+                              onChangeText={setEditStatValue}
+                            />
+                            <TextInput
+                              style={[styles.textInput, { flex: 2 }]}
+                              placeholder="Label"
+                              value={editStatLabel}
+                              onChangeText={setEditStatLabel}
+                            />
+                          </View>
+                        )}
+                        {sec.type === 'image' ? (
+                          <>
+                            <TextInput
+                              style={styles.textInput}
+                              placeholder="Caption (optional)"
+                              placeholderTextColor={colors.textMuted}
+                              value={editCaption}
+                              onChangeText={setEditCaption}
+                            />
+                            <TextInput
+                              style={styles.textInput}
+                              placeholder="Photo credit (optional)"
+                              placeholderTextColor={colors.textMuted}
+                              value={editCredit}
+                              onChangeText={setEditCredit}
+                            />
+                          </>
+                        ) : (
+                          <TextInput
+                            style={[styles.textInput, styles.textArea]}
+                            placeholder="Write here..."
+                            placeholderTextColor={colors.textMuted}
+                            value={editContent}
+                            multiline
+                            autoFocus
+                            onChangeText={setEditContent}
+                          />
+                        )}
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity style={styles.editSaveBtn} onPress={() => handleSaveEdit(sec)}>
+                            <Text style={styles.editSaveText}>Save changes</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditingId(null)}>
+                            <Text style={styles.editCancelText}>Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
                     {sec.type === 'stat' && (
                       <Text style={styles.statPreviewText}>
                         {sec.statValue} — {sec.statLabel}
                       </Text>
                     )}
-                    <Text style={styles.sectionPreviewContent} numberOfLines={2}>
-                      {sec.content}
+                    {sec.type === 'image' && !!sec.imageUrl && (
+                      <Image source={{ uri: sec.imageUrl }} style={styles.pendingThumb} />
+                    )}
+                    <Text style={styles.sectionPreviewContent} numberOfLines={4}>
+                      {sec.content}{sec.credit ? ` (Photo: ${sec.credit})` : ''}
                     </Text>
+                      </>
+                    )}
                   </View>
                 ))}
 
@@ -571,7 +781,7 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                 <View style={styles.addSectionBox}>
                   <Text style={styles.addSectionTitle}>Add Content Block</Text>
                   <View style={styles.typeSelectorRow}>
-                    {(['paragraph', 'quote', 'stat'] as const).map(type => (
+                    {(['heading', 'paragraph', 'quote', 'stat', 'image'] as const).map(type => (
                       <TouchableOpacity
                         key={type}
                         style={[
@@ -586,11 +796,41 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                             newSectionType === type && styles.activeTypeBtnText
                           ]}
                         >
-                          {type}
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
+
+                  {newSectionType === 'image' && (
+                    <View style={{ marginTop: 8 }}>
+                      <TouchableOpacity
+                        style={styles.imgPickBtn}
+                        onPress={async () => {
+                          const uri = await pickValidatedImage();
+                          if (uri) setNewImageUri(uri);
+                        }}
+                      >
+                        <Ionicons name="image-outline" size={18} color={colors.primary} />
+                        <Text style={styles.imgPickText}>{newImageUri ? 'Choose a different photo' : 'Choose a photo'}</Text>
+                      </TouchableOpacity>
+                      {!!newImageUri && <Image source={{ uri: newImageUri }} style={styles.pendingThumb} />}
+                      <TextInput
+                        style={[styles.textInput, { marginTop: 8 }]}
+                        placeholder="Caption (optional)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newImageCaption}
+                        onChangeText={setNewImageCaption}
+                      />
+                      <TextInput
+                        style={[styles.textInput, { marginTop: 8 }]}
+                        placeholder="Photo credit (optional)"
+                        placeholderTextColor={colors.textMuted}
+                        value={newImageCredit}
+                        onChangeText={setNewImageCredit}
+                      />
+                    </View>
+                  )}
 
                   {newSectionType === 'stat' && (
                     <View style={styles.inputRow}>
@@ -609,10 +849,13 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                     </View>
                   )}
 
+                  {newSectionType !== 'image' && (
                   <TextInput
                     style={[styles.textInput, styles.textArea, { marginTop: 8 }]}
                     placeholder={
-                      newSectionType === 'quote'
+                      newSectionType === 'heading'
+                        ? 'Heading text...'
+                        : newSectionType === 'quote'
                         ? 'Enter quote text...'
                         : newSectionType === 'stat'
                         ? 'Contextual details about this statistic...'
@@ -624,6 +867,7 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                     numberOfLines={3}
                     onChangeText={setNewSectionContent}
                   />
+                  )}
 
                   <TouchableOpacity
                     style={styles.addBlockBtn}
@@ -681,7 +925,7 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                     style={styles.addSourceBtn}
                     onPress={handleAddSource}
                   >
-                    <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
+                    <Ionicons name="link-outline" size={14} color={colors.primary} />
                     <Text style={styles.addSourceBtnText}>Add Citation</Text>
                   </TouchableOpacity>
                 </View>
@@ -709,6 +953,38 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
             <Text style={styles.stepSubheader}>
               Configure how your message will appear when community-backed ads run on social media.
             </Text>
+
+            <View style={styles.pvSection}>
+              <Text style={styles.pvSectionTitle}>Ad image</Text>
+              {coverImage ? (
+                <Image source={{ uri: coverImage }} style={styles.pendingThumb} />
+              ) : (
+                <Text style={styles.pvWarn}>
+                  Missing: your ad has no image. Ads without an image are weaker, and a reviewer may send the campaign back.
+                </Text>
+              )}
+              {!!coverImage && PRESET_IMAGES.includes(coverImage) && (
+                <Text style={styles.pvWarn}>
+                  This is a sample image. Upload your own for a more credible ad.
+                </Text>
+              )}
+              <TouchableOpacity
+                style={styles.imgPickBtn}
+                onPress={async () => {
+                  const uri = await pickValidatedImage();
+                  if (uri) setCoverImage(uri);
+                }}
+              >
+                <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
+                <Text style={styles.imgPickText}>{coverImage ? 'Replace image' : 'Upload ad image'}</Text>
+              </TouchableOpacity>
+              <Text style={styles.pvNote}>
+                JPG, PNG or WebP, up to 5 MB. Your ad uses the same image as your campaign cover.
+              </Text>
+              <Text style={styles.pvNote}>
+                Video ads and AI image generation are not available in this prototype. Upload an existing image or choose a sample image in Step 1.
+              </Text>
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Social Ad Headline</Text>
@@ -1014,7 +1290,11 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
                   ) : sec.type === 'image' && sec.imageUrl ? (
                     <View key={sec.id}>
                       <Image source={{ uri: sec.imageUrl }} style={styles.pvInlineImg} />
-                      {!!sec.caption && <Text style={styles.pvCaption}>{sec.caption}</Text>}
+                      {(!!sec.caption || !!sec.credit) && (
+                        <Text style={styles.pvCaption}>
+                          {sec.caption}{sec.caption && sec.credit ? ' · ' : ''}{sec.credit ? `Photo: ${sec.credit}` : ''}
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     <Text key={sec.id} style={[styles.pvP, sec.type === 'quote' && styles.pvQuote]}>
@@ -1312,6 +1592,17 @@ export const CreateCampaignScreen: React.FC<CreateCampaignScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  editSaveBtn: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.primary },
+  editSaveText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  editCancelBtn: { minHeight: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  editCancelText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  moveRow: { flexDirection: 'row', alignItems: 'center' },
+  moveBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  imgPickBtn: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  imgPickText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+  pendingThumb: { width: '100%', height: 140, borderRadius: 10, marginTop: 8 },
+  uploadTile: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryLight, borderColor: colors.primary, borderStyle: 'dashed' },
+  uploadTileText: { fontSize: 11, fontWeight: '600', color: colors.primary, marginTop: 2 },
   pvBanner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 12, borderRadius: 12, backgroundColor: colors.primaryLight, marginBottom: 12 },
   pvBannerText: { flex: 1, fontSize: 13, lineHeight: 18, color: colors.primaryDark },
   pvCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, marginBottom: 12 },
@@ -1401,10 +1692,9 @@ const styles = StyleSheet.create({
     gap: 16
   },
   stepHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: 8
   },
   stepHeader: {
     fontSize: 20,
@@ -1420,14 +1710,16 @@ const styles = StyleSheet.create({
   previewToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    marginTop: 10,
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    gap: 6
   },
   previewToggleText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.primary
   },

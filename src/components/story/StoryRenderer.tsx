@@ -86,8 +86,12 @@ export const StoryRenderer: React.FC<StoryRendererProps> = ({
                     resizeMode="cover"
                   />
                 )}
-                {section.caption && (
-                  <Text style={styles.caption}>{section.caption}</Text>
+                {(section.caption || section.credit) && (
+                  <Text style={styles.caption}>
+                    {section.caption}
+                    {section.caption && section.credit ? ' · ' : ''}
+                    {section.credit ? `Photo: ${section.credit}` : ''}
+                  </Text>
                 )}
               </View>
             );

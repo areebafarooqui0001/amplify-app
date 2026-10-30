@@ -209,7 +209,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View>
           <Text style={styles.feedSectionTitle}>Active Campaigns</Text>
           <Text style={styles.feedSectionSubtitle}>
-            Open for backing now
+            Open for backing now. Sample campaigns and figures are demo data.
           </Text>
         </View>
         <TouchableOpacity onPress={onNavigateToExplore}>

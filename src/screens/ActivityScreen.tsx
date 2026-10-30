@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { NotificationItem, Campaign } from '../types/campaign';
 import { useCampaigns } from '../context/CampaignContext';
+import { ProgressBar } from '../components/common/ProgressBar';
+import { Image } from 'react-native';
 
 interface ActivityScreenProps {
   onSelectCampaignById: (campaignId: string) => void;
@@ -22,23 +24,26 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({
   const {
     notifications,
     markNotificationAsRead,
-    markAllNotificationsAsRead
+    markAllNotificationsAsRead,
+    campaigns,
+    followedCampaignIds,
+    notificationPrefs,
+    setNotificationPref,
+    isNotificationEnabled
   } = useCampaigns();
+  const [view, setView] = useState<'updates' | 'following'>('updates');
+  const followedCampaigns = campaigns.filter(c => followedCampaignIds.includes(c.id));
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'milestone' | 'contribution' | 'promotion'>('all');
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Preference switches
-  const [milestonePush, setMilestonePush] = useState<boolean>(true);
-  const [deliveryReportsPush, setDeliveryReportsPush] = useState<boolean>(true);
-  const [backedCampaignUpdates, setBackedCampaignUpdates] = useState<boolean>(true);
-
   const filteredNotifications = notifications.filter(n => {
+    if (!isNotificationEnabled(n)) return false;
     if (activeFilter === 'all') return true;
     return n.type === activeFilter;
   });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read && isNotificationEnabled(n)).length;
 
   const getIconForType = (type: NotificationItem['type']) => {
     switch (type) {
@@ -96,52 +101,86 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({
         </View>
       </View>
 
-      {/* Optional Notification Preferences Tray */}
+      {/* Notification preferences */}
       {showSettings && (
         <View style={styles.settingsTray}>
-          <Text style={styles.settingsTitle}>Notification Preferences</Text>
+          <Text style={styles.settingsTitle}>Notification preferences</Text>
+          <Text style={styles.switchDesc}>
+            A category that is switched off is hidden from this feed and from the unread count.
+          </Text>
 
           <View style={styles.switchRow}>
             <View style={styles.switchLabelContainer}>
-              <Text style={styles.switchTitle}>Campaign Milestones</Text>
-              <Text style={styles.switchDesc}>When campaigns reach 50%, 80%, and goal</Text>
+              <Text style={styles.switchTitle}>Funding milestones</Text>
+              <Text style={styles.switchDesc}>When a campaign reaches a funding milestone or its goal</Text>
             </View>
             <Switch
-              value={milestonePush}
-              onValueChange={setMilestonePush}
+              value={notificationPrefs.milestone}
+              onValueChange={v => setNotificationPref('milestone', v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={milestonePush ? colors.primary : '#FFFFFF'}
+              thumbColor={notificationPrefs.milestone ? colors.primary : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.switchRow}>
             <View style={styles.switchLabelContainer}>
-              <Text style={styles.switchTitle}>Live Ad Delivery Reports</Text>
-              <Text style={styles.switchDesc}>Weekly reach numbers and impressions delivered</Text>
+              <Text style={styles.switchTitle}>Promotion and reports</Text>
+              <Text style={styles.switchDesc}>When promotion starts and delivery reports are ready (demo data)</Text>
             </View>
             <Switch
-              value={deliveryReportsPush}
-              onValueChange={setDeliveryReportsPush}
+              value={notificationPrefs.promotion}
+              onValueChange={v => setNotificationPref('promotion', v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={deliveryReportsPush ? colors.primary : '#FFFFFF'}
+              thumbColor={notificationPrefs.promotion ? colors.primary : '#FFFFFF'}
             />
           </View>
 
           <View style={styles.switchRow}>
             <View style={styles.switchLabelContainer}>
-              <Text style={styles.switchTitle}>Backed Messages</Text>
-              <Text style={styles.switchDesc}>Updates on campaigns you have amplified</Text>
+              <Text style={styles.switchTitle}>Payments and backed campaigns</Text>
+              <Text style={styles.switchDesc}>Contribution results and updates on campaigns you backed</Text>
             </View>
             <Switch
-              value={backedCampaignUpdates}
-              onValueChange={setBackedCampaignUpdates}
+              value={notificationPrefs.contribution}
+              onValueChange={v => setNotificationPref('contribution', v)}
               trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={backedCampaignUpdates ? colors.primary : '#FFFFFF'}
+              thumbColor={notificationPrefs.contribution ? colors.primary : '#FFFFFF'}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.switchTitle}>Review and account</Text>
+              <Text style={styles.switchDesc}>Submission, review decisions and account notices</Text>
+            </View>
+            <Switch
+              value={notificationPrefs.status}
+              onValueChange={v => setNotificationPref('status', v)}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={notificationPrefs.status ? colors.primary : '#FFFFFF'}
             />
           </View>
         </View>
       )}
 
+      {/* Updates / Following switch */}
+      <View style={styles.viewToggleRow}>
+        {(['updates', 'following'] as const).map(v => (
+          <TouchableOpacity
+            key={v}
+            style={[styles.viewToggleBtn, view === v && styles.viewToggleBtnActive]}
+            onPress={() => setView(v)}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.viewToggleText, view === v && styles.viewToggleTextActive]}>
+              {v === 'updates' ? 'Updates' : `Following (${followedCampaigns.length})`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {view === 'updates' ? (
+        <>
       {/* Filter Tabs */}
       <View style={styles.filterRow}>
         {(['all', 'milestone', 'promotion', 'contribution'] as const).map(tab => (
@@ -212,11 +251,56 @@ export const ActivityScreen: React.FC<ActivityScreenProps> = ({
           })
         )}
       </ScrollView>
+        </>
+      ) : (
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {followedCampaigns.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-outline" size={44} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>You are not following any campaigns</Text>
+              <Text style={styles.emptySubtitle}>
+                Tap Follow on a campaign page to keep its progress here.
+              </Text>
+            </View>
+          ) : (
+            followedCampaigns.map(c => {
+              const ratio = c.funding.goalAmount > 0 ? Math.min(1, c.funding.currentAmount / c.funding.goalAmount) : 0;
+              const statusLabel = (colors.status as any)[c.status]?.label || c.status;
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.followCard}
+                  onPress={() => onSelectCampaignById(c.id)}
+                  activeOpacity={0.85}
+                >
+                  <Image source={{ uri: c.coverImage }} style={styles.followThumb} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.followTitle} numberOfLines={2}>{c.title}</Text>
+                    <Text style={styles.followMeta}>
+                      {statusLabel} · ${c.funding.currentAmount.toLocaleString()} of ${c.funding.goalAmount.toLocaleString()} (demo)
+                    </Text>
+                    <ProgressBar progress={ratio} height={6} color={colors.primary} style={{ marginTop: 8 }} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  viewToggleRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  viewToggleBtn: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  viewToggleBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  viewToggleText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
+  viewToggleTextActive: { color: '#FFFFFF' },
+  followCard: { flexDirection: 'row', gap: 12, padding: 12, marginBottom: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  followThumb: { width: 64, height: 64, borderRadius: 10 },
+  followTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  followMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4 },
   container: {
     flex: 1,
     backgroundColor: colors.background

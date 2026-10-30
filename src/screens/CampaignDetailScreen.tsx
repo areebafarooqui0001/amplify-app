@@ -32,6 +32,8 @@ export const CampaignDetailScreen: React.FC<CampaignDetailScreenProps> = ({
   const {
     bookmarkedCampaignIds,
     toggleBookmark,
+    followedCampaignIds,
+    toggleFollow,
     voteFeedback,
     addComment
   } = useCampaigns();
@@ -91,6 +93,21 @@ export const CampaignDetailScreen: React.FC<CampaignDetailScreenProps> = ({
           {campaign.title}
         </Text>
         <View style={styles.navRight}>
+          <TouchableOpacity
+            style={[styles.followPill, followedCampaignIds.includes(campaign.id) && styles.followPillActive]}
+            onPress={() => toggleFollow(campaign.id)}
+            accessibilityRole="button"
+            accessibilityLabel="Follow this campaign for updates"
+          >
+            <Ionicons
+              name={followedCampaignIds.includes(campaign.id) ? 'notifications' : 'notifications-outline'}
+              size={15}
+              color={followedCampaignIds.includes(campaign.id) ? '#FFFFFF' : colors.primary}
+            />
+            <Text style={[styles.followPillText, followedCampaignIds.includes(campaign.id) && { color: '#FFFFFF' }]}>
+              {followedCampaignIds.includes(campaign.id) ? 'Following' : 'Follow'}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.navBtn}
             onPress={() => toggleBookmark(campaign.id)}
@@ -155,7 +172,7 @@ export const CampaignDetailScreen: React.FC<CampaignDetailScreenProps> = ({
                 ${campaign.funding.currentAmount.toLocaleString()}
               </Text>
               <Text style={styles.goalSubtext}>
-                of ${campaign.funding.goalAmount.toLocaleString()} amplification goal
+                of ${campaign.funding.goalAmount.toLocaleString()} funding goal (demo figures)
               </Text>
             </View>
             <View style={styles.percentBadge}>
@@ -465,6 +482,9 @@ export const CampaignDetailScreen: React.FC<CampaignDetailScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  followPill: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 40, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.surface },
+  followPillActive: { backgroundColor: colors.primary },
+  followPillText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   container: {
     flex: 1,
     backgroundColor: colors.surface

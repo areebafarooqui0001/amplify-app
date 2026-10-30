@@ -35,7 +35,7 @@ const SLIDES: OnboardingSlide[] = [
     title: 'Your Voice, Amplified',
     subtitle: 'CREATE CAMPAIGNS',
     description:
-      'Turn important messages into powerful campaigns that reach thousands. Whether it\u0027s health awareness, environmental action, or community news \u2014 your message deserves to be heard.',
+      'Turn an important message into a campaign that can reach people beyond your own network. Health, environment, education or community news: if it matters to you, you can share it here.',
   },
   {
     id: '2',
@@ -45,7 +45,7 @@ const SLIDES: OnboardingSlide[] = [
     title: 'Community-Powered Reach',
     subtitle: 'BACK WITH MICRO-FUNDS',
     description:
-      'Backers pool small contributions to fund social media ads on Meta, Instagram, and more. This is not a donation platform \u2014 every dollar goes toward amplifying the message.',
+      'Backers pool small contributions to pay for ads on Facebook and Instagram. This is not a donation platform: contributions pay for ads, not for the cause or the creator.',
   },
   {
     id: '3',
@@ -55,7 +55,7 @@ const SLIDES: OnboardingSlide[] = [
     title: 'Clear about where money goes',
     subtitle: '95% ADS \u2022 5% PLATFORM',
     description:
-      'Every campaign is reviewed for accuracy before going live. 95% of contributions fund ad distribution, with full transparency on reach metrics and spend.',
+      'A reviewer checks every campaign before it opens for backing. In this demo, 95% of each contribution goes to ads and 5% to platform and payment fees. Reach figures are estimates.',
   },
 ];
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { CampaignFeedSkeleton } from '../components/common/Skeleton';
 import { Campaign, CampaignCategory } from '../types/campaign';
 import { useCampaigns } from '../context/CampaignContext';
 import { CampaignCard } from '../components/cards/CampaignCard';
@@ -40,6 +41,11 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
 }) => {
   const { campaigns, bookmarkedCampaignIds, toggleBookmark } = useCampaigns();
 
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  useEffect(() => {
+    const t = setTimeout(() => setIsLoading(false), 700);
+    return () => clearTimeout(t);
+  }, []);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<'All' | CampaignCategory>('All');
   const [selectedSort, setSelectedSort] = useState<SortOption>('trending');
@@ -257,7 +263,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
       {/* Results Header */}
       <View style={styles.resultsCountRow}>
         <Text style={styles.resultsCountText}>
-          {filteredCampaigns.length} {filteredCampaigns.length === 1 ? 'campaign' : 'campaigns'} found
+          {filteredCampaigns.length} {filteredCampaigns.length === 1 ? 'campaign' : 'campaigns'} found (demo data)
         </Text>
         {(searchQuery || selectedCategory !== 'All' || statusFilter !== 'all') && (
           <TouchableOpacity onPress={handleResetFilters}>
@@ -267,6 +273,9 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
       </View>
 
       {/* Campaign List */}
+      {isLoading ? (
+        <CampaignFeedSkeleton count={2} />
+      ) : (
       <FlatList
         data={filteredCampaigns}
         keyExtractor={item => item.id}
@@ -296,6 +305,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({
         }
         contentContainerStyle={styles.listContent}
       />
+      )}
     </View>
   );
 };

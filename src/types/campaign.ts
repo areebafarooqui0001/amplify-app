@@ -27,6 +27,7 @@ export interface StorySection {
   type: 'heading' | 'paragraph' | 'quote' | 'stat' | 'image';
   content: string;
   caption?: string;
+  credit?: string;
   statValue?: string;
   statLabel?: string;
   imageUrl?: string;
@@ -147,6 +148,13 @@ export interface NotificationItem {
   type: 'milestone' | 'submission' | 'contribution' | 'promotion' | 'system';
   campaignId?: string;
   read: boolean;
+}
+
+export interface NotificationPrefs {
+  milestone: boolean;
+  promotion: boolean;
+  contribution: boolean;
+  status: boolean;
 }
 
 export type UserRole = 'audience' | 'creator' | 'backer' | 'admin';

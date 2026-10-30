@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { INFO_PAGES } from '../data/infoPages';
 import { Campaign, UserRole } from '../types/campaign';
 import { useCampaigns } from '../context/CampaignContext';
 import { StatusBadge } from '../components/common/Badge';
@@ -257,45 +258,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         )}
       </View>
 
-      {/* Secondary Destinations Links */}
+      {/* Help, policies and about */}
       <View style={styles.secondaryMenuCard}>
-        <Text style={styles.menuHeader}>Platform & Transparency</Text>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setShowSecondaryModal('how_it_works')}
-        >
-          <Ionicons name="help-circle-outline" size={18} color={colors.text} />
-          <Text style={styles.menuItemText}>How Amplification Works</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setShowSecondaryModal('partners')}
-        >
-          <Ionicons name="megaphone-outline" size={18} color={colors.text} />
-          <Text style={styles.menuItemText}>Ad Networks & Distribution Partners</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setShowSecondaryModal('fees')}
-        >
-          <Ionicons name="receipt-outline" size={18} color={colors.text} />
-          <Text style={styles.menuItemText}>Transparent Fee Breakdown (95/5)</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setShowSecondaryModal('guidelines')}
-        >
-          <Ionicons name="shield-outline" size={18} color={colors.text} />
-          <Text style={styles.menuItemText}>Fact-Checking & Content Guidelines</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
+        <Text style={styles.menuHeader}>Help, policies and about</Text>
+        {INFO_PAGES.map(page => (
+          <TouchableOpacity
+            key={page.key}
+            style={styles.menuItem}
+            onPress={() => setShowSecondaryModal(page.key)}
+            accessibilityRole="button"
+          >
+            <Ionicons name={page.icon as any} size={18} color={colors.text} />
+            <Text style={styles.menuItemText}>{page.title}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Reset Demo Data */}
@@ -320,38 +297,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <View style={styles.secondarySheet}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>
-                {showSecondaryModal === 'how_it_works' && 'How Amplification Works'}
-                {showSecondaryModal === 'partners' && 'Distribution & Ad Networks'}
-                {showSecondaryModal === 'fees' && 'Transparent 95/5 Fee Policy'}
-                {showSecondaryModal === 'guidelines' && 'Fact-Checking Guidelines'}
+                {INFO_PAGES.find(pg => pg.key === showSecondaryModal)?.title}
               </Text>
               <TouchableOpacity onPress={() => setShowSecondaryModal(null)}>
                 <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 350 }}>
-              {showSecondaryModal === 'how_it_works' && (
-                <Text style={styles.sheetBody}>
-                  The Campaign Amplification Platform is community-funded message distribution. Anyone can discover, back, or create a campaign. Once approved by our review team, backer contributions are used to purchase micro-targeted digital advertising inventory across Meta, Instagram, and partnered networks. Contributions do not pass to the creator&apos;s personal account.
-                </Text>
-              )}
-              {showSecondaryModal === 'partners' && (
-                <Text style={styles.sheetBody}>
-                  We distribute approved messages through official programmatic ad APIs including Meta Ads (Facebook & Instagram Feed & Stories), TikTok Ads, and Google Display Network. Ads are clearly labelled as community-amplified and include direct links to cited sources.
-                </Text>
-              )}
-              {showSecondaryModal === 'fees' && (
-                <Text style={styles.sheetBody}>
-                  • 95% of every dollar contributed goes directly into digital ad spend auction bids.{'\n\n'}
-                  • 5% platform fee covers payment processing fees (Stripe/Apple Pay), cloud hosting, and editorial source-audit verification overhead.
-                </Text>
-              )}
-              {showSecondaryModal === 'guidelines' && (
-                <Text style={styles.sheetBody}>
-                  All campaigns must cite verifiable primary research, governmental open data, or peer-reviewed journals. Deceptive headlines, hate speech, and unverified medical claims are strictly rejected during our editorial audit.
-                </Text>
-              )}
+            <ScrollView style={{ maxHeight: 440 }}>
+              {(INFO_PAGES.find(pg => pg.key === showSecondaryModal)?.body || []).map((para, i) => (
+                <Text key={i} style={[styles.sheetBody, { marginBottom: 12 }]}>{para}</Text>
+              ))}
             </ScrollView>
           </View>
         </View>

@@ -4,6 +4,7 @@ import {
   Campaign,
   Contribution,
   NotificationItem,
+  NotificationPrefs,
   UserRole,
   CampaignStatus
 } from '../types/campaign';
@@ -36,6 +37,11 @@ interface CampaignContextType {
     backerName?: string
   ) => Promise<Contribution>;
   settlePendingContribution: (contributionId: string) => Promise<Contribution | null>;
+  followedCampaignIds: string[];
+  toggleFollow: (campaignId: string) => void;
+  notificationPrefs: NotificationPrefs;
+  setNotificationPref: (key: keyof NotificationPrefs, value: boolean) => void;
+  isNotificationEnabled: (n: NotificationItem) => boolean;
   toggleBookmark: (campaignId: string) => void;
   voteFeedback: (campaignId: string, vote: 'yes' | 'somewhat' | 'no') => void;
   addComment: (campaignId: string, text: string) => void;
@@ -54,7 +60,9 @@ const STORAGE_KEYS = {
   CONTRIBUTIONS: '@amplify_contributions_v2',
   BOOKMARKS: '@amplify_bookmarks_v2',
   NOTIFICATIONS: '@amplify_notifications_v2',
-  USER_ROLE: '@amplify_user_role_v2'
+  USER_ROLE: '@amplify_user_role_v2',
+  FOLLOWED: '@amplify_followed_v1',
+  NOTIF_PREFS: '@amplify_notif_prefs_v1'
 };
 
 const CampaignContext = createContext<CampaignContextType | undefined>(undefined);
@@ -64,6 +72,13 @@ export const CampaignProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [savedDraft, setSavedDraft] = useState<Partial<Campaign> | null>(null);
   const [userContributions, setUserContributions] = useState<Contribution[]>([]);
   const [bookmarkedCampaignIds, setBookmarkedCampaignIds] = useState<string[]>(['camp-1']);
+  const [followedCampaignIds, setFollowedCampaignIds] = useState<string[]>([]);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>({
+    milestone: true,
+    promotion: true,
+    contribution: true,
+    status: true
+  });
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
   const [userRole, setUserRoleState] = useState<UserRole>('audience');
   const [isDraftSavedAlertVisible, setIsDraftSavedAlertVisible] = useState(false);
@@ -201,6 +216,48 @@ export const CampaignProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updatedNotifs));
 
     return newCampaign;
+  };
+
+  // Load saved follow list and notification preferences once.
+  useEffect(() => {
+    (async () => {
+      try {
+        const f = await AsyncStorage.getItem(STORAGE_KEYS.FOLLOWED);
+        if (f) setFollowedCampaignIds(JSON.parse(f));
+        const p = await AsyncStorage.getItem(STORAGE_KEYS.NOTIF_PREFS);
+        if (p) setNotificationPrefs(prev => ({ ...prev, ...JSON.parse(p) }));
+      } catch {
+        // Defaults are fine if storage is unavailable.
+      }
+    })();
+  }, []);
+
+  const toggleFollow = (campaignId: string) => {
+    const next = followedCampaignIds.includes(campaignId)
+      ? followedCampaignIds.filter(id => id !== campaignId)
+      : [...followedCampaignIds, campaignId];
+    setFollowedCampaignIds(next);
+    AsyncStorage.setItem(STORAGE_KEYS.FOLLOWED, JSON.stringify(next)).catch(() => {});
+  };
+
+  const setNotificationPref = (key: keyof NotificationPrefs, value: boolean) => {
+    const next = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(next);
+    AsyncStorage.setItem(STORAGE_KEYS.NOTIF_PREFS, JSON.stringify(next)).catch(() => {});
+  };
+
+  // A notification is shown only if its category is switched on.
+  const isNotificationEnabled = (n: NotificationItem): boolean => {
+    switch (n.type) {
+      case 'milestone':
+        return notificationPrefs.milestone;
+      case 'promotion':
+        return notificationPrefs.promotion;
+      case 'contribution':
+        return notificationPrefs.contribution;
+      default:
+        return notificationPrefs.status;
+    }
   };
 
   // Non-successful payment attempts are recorded for payment history but never change funding progress.
@@ -554,6 +611,11 @@ export const CampaignProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         backCampaign,
         recordPaymentAttempt,
         settlePendingContribution,
+        followedCampaignIds,
+        toggleFollow,
+        notificationPrefs,
+        setNotificationPref,
+        isNotificationEnabled,
         toggleBookmark,
         voteFeedback,
         addComment,

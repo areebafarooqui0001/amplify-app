@@ -32,7 +32,7 @@ import { OnboardingScreen, ONBOARDING_KEY } from './src/screens/OnboardingScreen
 type TabName = 'home' | 'explore' | 'create' | 'activity' | 'profile';
 
 const MainAppContent: React.FC = () => {
-  const { campaigns, notifications } = useCampaigns();
+  const { campaigns, notifications, isNotificationEnabled } = useCampaigns();
 
   const [activeTab, setActiveTab] = useState<TabName>('home');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -53,7 +53,7 @@ const MainAppContent: React.FC = () => {
     });
   }, []);
 
-  const unreadNotificationsCount = notifications.filter(n => !n.read).length;
+  const unreadNotificationsCount = notifications.filter(n => !n.read && isNotificationEnabled(n)).length;
 
   const handleSelectCampaignById = (id: string) => {
     const found = campaigns.find(c => c.id === id);

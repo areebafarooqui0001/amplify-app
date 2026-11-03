@@ -6,6 +6,8 @@ A mobile app for community-funded message amplification. Someone with an importa
 
 Built with React Native (Expo) and TypeScript for the Humanity Founders Campaign Amplification hackathon, where it received a letter of distinction. The matching backend lives in the `amplify-api` repository.
 
+The backend for this app is a separate project: [amplify-api](https://github.com/areebafarooqui0001/amplify-api), with live docs at https://amplify-api-qvr9.onrender.com/docs
+
 ## What you can do in the app
 
 **Anyone, without an account**
